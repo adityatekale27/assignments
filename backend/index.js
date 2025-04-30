@@ -16,15 +16,16 @@ app.post("/login", (req, res) => {
     const { username, password } = req.body;
     const user = users.find((user) => user.username === username.toLowerCase() && user.password === password);
 
+    // if user exists then generate token and add that token as key and username as value in sessions object
     if (user) {
       const token = Date.now();
       sessions[token] = username;
       return res.status(200).send({ token, message: `Please copy this in the headers, key as "token" and value as ${token} to access protected routes` });
     }
 
-    res.status(401).send("Invalid credentials");
+    return res.status(401).send("Invalid credentials");
   } catch (error) {
-    res.status(500).send("Something went wrong, Try again!");
+    return res.status(500).send("Something went wrong, Try again!");
   }
 });
 
@@ -42,9 +43,9 @@ app.post("/signup", (req, res) => {
     // add user detials in the array of users and return the username and passwrod to the user for login
     const usernameLowerCase = username.toLowerCase();
     users.push({ username: usernameLowerCase, password });
-    res.status(201).send(`User created succesfully, login with username: ${username} and password: ${password} to generate token.`);
+    return res.status(201).send(`User created succesfully, login with username: ${username} and password: ${password} to generate token.`);
   } catch (error) {
-    res.status(500).send("Something went wrong, Try again!");
+    return res.status(500).send("Something went wrong, Try again!");
   }
 });
 
@@ -52,7 +53,7 @@ app.post("/signup", (req, res) => {
 app.get("/tasks", authenticateUser, (req, res) => {
   try {
     let userTasks = tasks.filter((tasks) => tasks.owner === req.username);
-    if (userTasks.length === 0) return res.status(404).send("You does not have any tasks please add task first");
+    if (userTasks.length === 0) return res.status(200).send({ message: "You does not have any tasks please add task first", userTasks });
 
     // filter tasks based on title
     if (req.query.title) {
@@ -74,15 +75,15 @@ app.get("/tasks", authenticateUser, (req, res) => {
       });
     }
 
-    // pagination of userTasks
+    // pagination of userTasks, on the basis of requested page and limit query
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || userTasks.length;
     const startIndex = (page - 1) * limit;
     const paginatedTasks = userTasks.slice(startIndex, startIndex + limit);
 
-    res.status(200).send({ message: `Tasks of ${req.username}`, page, limit, totalTasks: userTasks.length, userTasks: paginatedTasks });
+    return res.status(200).send({ message: `Tasks of ${req.username}`, page, limit, totalTasks: userTasks.length, userTasks: paginatedTasks });
   } catch (error) {
-    res.status(500).send("Something went wrong, try again!");
+    return res.status(500).send("Something went wrong, try again!");
   }
 });
 
@@ -91,15 +92,15 @@ app.get("/tasks/:id", authenticateUser, (req, res) => {
   try {
     // get the id from params
     const id = Number(req.params.id);
-    if (!id) return res.status(400).send("Please provide ID to get specific task");
+    if (!Number.isInteger(id)) return res.status(400).send("Please provide ID to get specific task");
 
     // get specific task using id, if owser is logged in user
     const task = tasks.find((task) => task.id === id && task.owner === req.username);
-    if (!task) return res.status(404).send(`Task does found for id: ${id}`);
+    if (!task) return res.status(404).send(`Task does not found for id: ${id}`);
 
-    res.status(200).send({ message: "Fetched task successfully", task });
+    return res.status(200).send({ message: "Fetched task successfully", task });
   } catch (error) {
-    res.status(500).send("Something went wrong, try again");
+    return res.status(500).send("Something went wrong, try again");
   }
 });
 
@@ -112,9 +113,9 @@ app.post("/tasks", authenticateUser, (req, res) => {
     // create new task with id, title, desciption and owner field and push to tasks array
     const newTask = { id: taskId++, title, description, owner: req.username };
     tasks.push(newTask);
-    res.status(201).send({ message: "Task created successfully!", newTask });
+    return res.status(201).send({ message: "Task created successfully!", newTask });
   } catch (error) {
-    res.status(500).send("Something went wrong, try again!");
+    return res.status(500).send("Something went wrong, try again!");
   }
 });
 
@@ -123,7 +124,7 @@ app.put("/tasks/:id", authenticateUser, (req, res) => {
   try {
     // get the id from params
     const id = Number(req.params.id);
-    if (!id) return res.status(400).send("Please provide ID to get specific task");
+    if (!Number.isInteger(id)) return res.status(400).send("Please provide ID to get specific task");
 
     // get title and desciption from user
     const { title, description } = req.body;
@@ -135,9 +136,9 @@ app.put("/tasks/:id", authenticateUser, (req, res) => {
 
     task.title = title;
     task.description = description;
-    res.status(200).send({ message: "Task updated successfully", task });
+    return res.status(200).send({ message: "Task updated successfully", task });
   } catch (error) {
-    res.status(500).send("Something went wrong, try again!");
+    return res.status(500).send("Something went wrong, try again!");
   }
 });
 
@@ -146,7 +147,7 @@ app.delete("/tasks/:id", authenticateUser, (req, res) => {
   try {
     // get the id from params
     const id = Number(req.params.id);
-    if (!id) return res.status(400).send("Please provide ID to get specific task");
+    if (!Number.isInteger(id)) return res.status(400).send("Please provide ID to get specific task");
 
     // find the index of the task using id
     const taskIndex = tasks.findIndex((task) => task.id === id && task.owner === req.username);
@@ -154,9 +155,9 @@ app.delete("/tasks/:id", authenticateUser, (req, res) => {
 
     // remove the specific task at taskIndex from tasks array
     tasks.splice(taskIndex, 1);
-    res.status(200).send(`Task deleted with id: ${id}`);
+    return res.status(200).send(`Task deleted with id: ${id}`);
   } catch (error) {
-    res.status(500).send("Something went wrong, try again!");
+    return res.status(500).send("Something went wrong, try again!");
   }
 });
 
@@ -173,7 +174,7 @@ function authenticateUser(req, res, next) {
     // check if the token from header and token from session match if mathces then add username to the req object
     if (token && sessions[token]) {
       req.username = sessions[token];
-      next();
+      return next();
     }
 
     return res.status(401).send("Unauthorized");
